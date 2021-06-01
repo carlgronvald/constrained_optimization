@@ -66,12 +66,13 @@ if bdependent
 
     hold off
     for i=1:size(times,1)
-        plot(bs, times(i,:))
+        semilogy(bs, times(i,:))
         hold on
     end
     legend(names)
     xlabel("b(1)")
     ylabel("time [s]")
+    title("Time to solve given problem vs b(1)")
     
     figure
     hold off
@@ -81,7 +82,8 @@ if bdependent
     end
     legend(names(1:6))
     xlabel("b(1)")
-    ylabel("Error relative to quadprog")
+    ylabel("Absolute error")
+    title("Absolute error between found answer and quadprog vs b(1)")
     
 end
 
