@@ -1,0 +1,94 @@
+
+%x0 = [3.584428;-1.848126];
+%x0 = [0;3.8416];
+%x0 = [-3.779310;-3.283186];
+%x0 = [-2.805118; 3.131312]; %Svær for augmented
+%x0 = [-0.270845;-0.923039];
+%x0 = [-0.5498;-0.2193];
+x0 = [0.2;3.1];
+%x0 = [-200;190000];
+%x0 = [15000000;4];
+[f,df] = obj(x0);
+[c,dc] = con(x0);
+
+l = [-5;-5];
+u = [5;5];
+cl = [0;0];
+cu = [47;70];
+
+ 
+
+%{
+Options:
+log - Do you want to log the process
+    values: true/false
+
+method - Which SQP method
+    values: {SQP        (Plain vanilla SQP)
+            ,SQP_ls     (Line search SQP)
+            ,SQP_trust}
+%}
+
+
+options = struct('log',true, 'infesibility_handling', false, 'method', 'SQP_ls', 'subsolver', 'quadprog');
+[x,z, Hist] = SQPSolver(x0,@obj,@con,l,u,cl,cu,options);
+xHist = Hist.xHist;
+
+himmelPlot(x0,x,xHist)
+
+
+%% objective, constraints and derivitives
+function [f,df] = obj(x)
+
+x1 = x(1);
+x2 = x(2);
+
+temp1 = x1^2+x2-11;
+temp2 = x1+x2^2-7;
+
+f = temp1^2+temp2^2;
+
+df = zeros(2,1);
+df(1) = 4*x1*temp1+2*temp2;
+df(2) = 2*temp1+4*x2*temp2;
+
+end
+
+function [c,dc] = con(x)
+
+x1 = x(1);
+x2 = x(2);
+
+c = zeros(2,1);
+c(1) = (x1+2)^2-x2;
+c(2) = -4*x1+10*x2;
+
+dc = zeros(2,2);
+dc(1,1) = 2*x1+4;
+dc(1,2) = -1;
+dc(2,1) = -4;
+dc(2,2) = 10;
+
+dc = dc';
+
+end
+
+function [] = himmelPlot(x0,x,xHist)
+close all
+fig = figure('Position', [100, 0, 1000,1000]);
+hold on
+himmelblauContours
+plot(x0(1,:),x0(2,:),'k.','markersize',40) 
+plot(x(1,:),x(2,:),'r.','markersize',40) 
+h1 = plot(xHist(1,:),xHist(2,:),'b-.','linewidth',2);
+legend(h1,'Starting Point','location','northeast')
+% show constraints
+x1lim = 5; x1 = -x1lim:0.01:x1lim;
+x2lim = 5; x2 = -x1lim:0.01:x2lim;
+x1f = -5:0.01:5;
+fill(x1f, x1f.^2 + 4.*x1f + 4, [0 0 0], 'FaceAlpha', 0.5, 'EdgeColor', 'none')
+patch('Faces',[1 2 3], 'Vertices', [-x1lim 0.4*-x1lim; x1lim 0.4*x1lim; x1lim -999], 'FaceColor', 'black', 'FaceAlpha', 0.5, 'EdgeColor', 'none')
+% set axis as needed
+axis([-7 7 -7 7])
+hold off
+end

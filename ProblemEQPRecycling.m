@@ -1,0 +1,14 @@
+function [H,g,A,b] = ProblemEQPRecycling(n, uhat, d0)
+    H = eye(n+1);
+    g = uhat*ones(n+1,1);
+    A = eye(n);
+    sub = eye(n);
+    sub = circshift(sub,1,2);
+    A = A - sub;
+    A = padarray(A,[0 1],0,'post');
+    A(end-1,end) = -1;
+    A(end-1,end-1) = -1;
+    A(end-1,end-2) = 1;
+    A = A';
+    b = zeros(n,1);
+    b(n) = -d0;
