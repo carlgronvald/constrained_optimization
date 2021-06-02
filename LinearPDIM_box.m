@@ -1,6 +1,5 @@
 function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
     mIn = length(u);
-    m = length(y0);
     epsilon = 0.000000001;
     max_iter = 100;
     eta = 0.995;
@@ -29,18 +28,20 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
     % Initial point heuristic
     zsl = zl./sl;
     zsu = zu./su;
-    Hbar = diag(zsl + zsu);
-    KKT = [Hbar -A; -A' zeros(m)];
-    KKT = sparse(KKT);
-    [L,D, P] = ldl(KKT);
-
+    
     % Affine step
     rCs = (rC-s);
     rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
-    rhs = -[rLbar ; rA];
-    solution = P*(L' \ (D \ (L \ (P'*rhs) )));
-
-    dxAff = solution(1:length(x));
+    Hbar_diagonal_inverse = 1./(zsl+zsu);
+    % Calculate the factor in the normal equation
+    normalfactor = A' * (Hbar_diagonal_inverse .*  A);
+    R = chol(normalfactor);
+    
+    mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
+    %This is normal equation stuff as well
+    % I should probably factorize the normal factor myself.
+    dyAff = R \ (R' \ mu_rhs);
+    dxAff = Hbar_diagonal_inverse .* (-rLbar + A*dyAff);
 
     dzAff = - [zsl.*dxAff; -zsu.*dxAff] + (z./s).*rCs;
     dsAff = -s-(s./z).*dzAff;
@@ -68,18 +69,25 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         iter = iter + 1;
         zsl = zl./sl;
         zsu = zu./su;
-        Hbar = diag(zsl + zsu);
-        KKT = [Hbar -A; -A' zeros(m)];
-        KKT = sparse(KKT);
-        [L,D, P] = ldl(KKT);
         
         % Affine step
         rCs = (rC-s);
         rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
-        rhs = -[rLbar ; rA];
-        solution = P*(L' \ (D \ (L \ (P'*rhs) )));
         
-        dxAff = solution(1:length(x));
+        
+        % CALCULATE DxAff USING NORMAL EQUATIONS
+        
+		Hbar_diagonal_inverse = 1./(zsl+zsu);
+        % Calculate the factor in the normal equation
+		normalfactor = A' * (Hbar_diagonal_inverse .*  A);
+        R = chol(normalfactor);
+        
+        mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
+        %This is normal equation stuff as well
+        % I should probably factorize the normal factor myself.
+		dyAff = R \ (R' \ mu_rhs);
+		dxAff = Hbar_diagonal_inverse .* (-rLbar + A*dyAff);
+        
         
         dzAff = - [zsl.*dxAff; -zsu.*dxAff] + (z./s).*rCs;
         dsAff = -s-(s./z).*dzAff;
@@ -96,13 +104,30 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         % Affine-Centering-Correction Direction
         rSZz = s + dsAff.*dzAff./z-dualGap*sigma*e./z;
         rCs = (rC-rSZz);
-        rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
         
-        rhs = -[rLbar ; rA];
-        solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+		rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
         
-        dx = solution(1:length(x));
-        dy = solution(length(x)+1:length(solution));
+		
+		% This is where we need to change things to use normal equations
+		% X^-1 Lambda = Hbar
+		% A dx = -rC
+		% (A Lambda^-1 X A') dy = -rc -A(-Lambda^-1 X rL - Lambda^-1 rC)
+		
+        %rhs = -[rLbar ; rA];
+        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+        
+        %dx = solution(1:length(x));
+        %dy = solution(length(x)+1:length(solution));
+        
+		% This has already been calculated: Hbar_diagonal_inverse = 1./(zsl+zsu);
+        % Calculate the factor in the normal equation
+		normalfactor = A' * (Hbar_diagonal_inverse .*  A);
+        R = chol(normalfactor);
+        
+        mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
+        %This is normal equation stuff as well
+		dy = R \ (R' \ mu_rhs);
+		dx = Hbar_diagonal_inverse .* (-rLbar + A*dy);
         
         dz = - [zsl.*dx; -zsu.*dx] + (z./s).*rCs;
         ds = -rSZz-(s./z).*dz;
@@ -110,7 +135,7 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         %compute max alpha
         dZS = [dz; ds];
         alphas = (-[z;s]./dZS);
-        alpha = min([1;alphas(dZS<0)]);
+        alpha = min([1;alphas(dZS<0)]); 
         
         alphaBar = eta*alpha;
         

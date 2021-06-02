@@ -1,18 +1,22 @@
-function [x,z,Hist] = SQP_trust(x0,obj,con,l,u,cl,cu,log,precision)
+function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region, penalty)
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);
-    penalty = 100;
-    dk0 = 0.5;
+    mu = penalty;
+    
+    
+    dk0 = trust_region;
     dk = dk0;
     time = 0;
+    dL2 = Inf;
 
     % Define relevant functions call
     x = x0;
-    [~,df] = feval(obj,x);
-    [c,dc] = feval(con,x);
+    [f,df] = obj(x);
+    [c,dc] = cons(x);
     B = eye(n);
     m = size(c,1);
+    mu_vec = mu*ones(n*2+m*2,1);
     z = ones(2*m+2*n,1);
     lid = 1:m;
     uid = (m+1):(2*m);
@@ -25,8 +29,11 @@ function [x,z,Hist] = SQP_trust(x0,obj,con,l,u,cl,cu,log,precision)
         pkHist = zeros(n,max_iter);
         timePerformence = zeros(1,max_iter);
         trustRegion = zeros(1,max_iter+1);
+        rhos = zeros(1,max_iter);
+        functionCalls = 2;
         
         xHist(:,1) = x0;
+        trustRegion(:,1) = dk;
     end
     
     % Define options for quadprog
@@ -38,92 +45,106 @@ function [x,z,Hist] = SQP_trust(x0,obj,con,l,u,cl,cu,log,precision)
     % Start for loop
     for i = 1:max_iter
         
-        % Update lower and upper bounds for the quadratic approximation
+        % Update lower and upper bounds for the quadrastart = cputime; approximation
         lk = -x+l;
         uk = -x+u;
         clk = -c+cl;
         cuk = -c+cu;
         
-        j = 0;
         % Define infesibility program
-        Hinf = [B zeros(n,2*m); zeros(2*m,2*m+n)];
-        ginf = [df; penalty*ones(2*m,1)];
-        iden = eye(m);
-        Cinf = [dc -dc zeros(m,2*m) iden  -iden;iden zeros(m,m) iden zeros(m,m) zeros(m,2*m); zeros(m,m) iden zeros(m,m) iden zeros(m,2*m) ]';
-        lkinf = [lk; zeros(2*m,1)];
-        ukinf = [uk; inf(2*m,1)];
-        while(true)
-            j = j+1;
-   
-            dinf = [clk; -cuk; zeros(2*m,1); -dk*ones(2*m,1)];
-            % Solves local QP program
-            tic
-            [pk,~,~,~,zhat] = quadprog(Hinf,ginf,-Cinf,-dinf,[],[],lkinf,ukinf,[],options);
-            time = time + toc;
-            if ~isempty(pk)
-                if log
-                   trustRegion(:,i) = dk; 
-                end
-                dk = dk0;
-                break
-            elseif j>30
-                msg = ['The trust region is of size ',num2str(dk*2^(j-1),'%02d'),' and the step is still not feasible. Try the method SQP_ls'];
-                error(msg)
-            else
-                dk = dk*2;
-            end
-        end
-        
+        Hinf = zeros(3*n+2*m);
+        Hinf(1:n,1:n) = B;
+        Cinf = [ eye(n) -eye(n) dc -dc zeros(n,2*m+2*n) eye(n)  -eye(n);eye(2*n+2*m) eye(2*n+2*m) zeros(2*m+2*n,n*2)]';
+        ginf = [df; mu_vec];
+        dinf = [lk; -uk;clk; -cuk; zeros(2*m+2*n,1); -dk*ones(2*m,1)];
+        start = cputime;
+        [pk,~,~,~,zhat] = quadprog(Hinf,ginf,-Cinf,-dinf,[],[],[],[],[],options);
+        time = time + cputime-start;
 
-        zhat = [zhat.lower(1:n); zhat.upper(1:n); zhat.ineqlin(1:2*m)];
+        zhat = zhat.ineqlin(1:2*m+2*n);
         pk = pk(1:n);
-        pz = zhat-z;
+        
+        %Update penalty
+        zinf = vecnorm(z,'Inf');
+        mu = max(1/2*(mu+zinf),zinf);
+        mu_vec = mu*ones(n*2+m*2,1);
+        
+        %Find rho
+        [c_full, dc_full] = cons(x,true,dinf(1:2*n+2*m));
+        functionCalls = functionCalls +1;
+
+        [c_p_full, ~] = cons(x+pk,true,dinf(1:2*n+2*m));
+        functionCalls = functionCalls +1;
+        
+        qp0 = f+df'*pk+1/2*pk'*B*pk+mu_vec'*max(0,-(c_full+dc_full'*pk));
+        q0 = f+mu_vec'*max(0,-(c_full));
+        phi1 = q0;
+        
+        [f_p,~] = obj(x+pk);
+        functionCalls = functionCalls +1;
+        phi1p = f_p+mu_vec'*max(0,-(c_p_full));
+        
+        rho = (phi1-phi1p)/(q0-qp0);
+        
+        gamma = min(max((2*rho-1)^3+1,0.25),2);
         
         
-
-        % Update the current point
-        z = z + pz;
-        x = x + pk;
+        if rho>0
+            % Update the current point
+            z = zhat;
+            x = x+pk;
         
 
-        % For the quasi Newton update  
-        dL = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
+            % For the quasi Newton update  
+            dL = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
 
-        % Update values for next iteration
-        [~,df] = feval(obj,x);
-        [c,dc] = feval(con,x);
 
-        % Quasi newton update of the hessian
-        dL2 = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
 
-        p = pk;
-        q = dL2-dL;
-        theta = 1;
-        Bp = (B*p);
-        pBp = p'*Bp;
-        
-        if p'*q < 0.2*pBp
-            theta = (0.8*pBp)/(pBp-p'*q);
+            % Update values for next iteration
+            [f,df] = feval(obj,x);
+            [c,dc] = feval(cons,x);
+
+            functionCalls = functionCalls +2;
+
+            % Quasi newton update of the hessian
+            dL2 = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
+
+            p = pk;
+            q = dL2-dL;
+            theta = 1;
+            Bp = (B*p);
+            pBp = p'*Bp;
+
+            if p'*q < 0.2*pBp
+                theta = (0.8*pBp)/(pBp-p'*q);
+            end
+            r = theta*q+(1-theta)*(Bp);
+            B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
+            dk = gamma*dk;
+        else
+            dk = gamma * vecnorm(pk,'Inf');
         end
-        r = theta*q+(1-theta)*(Bp);
-        B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
-        
+
+
         if log
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
             timePerformence(1,i) = time;
+            trustRegion(:,i+1) = dk;
+            rhos(:,i) = rho;
             time = 0;
         end
-        
-        
+
         if norm(dL2, 'inf')<epsilon
             if log
                 pkHist = pkHist(:,1:i);
                 xHist = xHist(:,1:i+1);
                 timePerformence = timePerformence(:,1:i);
-                trustRegion = trustRegion(:,1:i);
+                rhos = rhos(:,1:i);
+                trustRegion = trustRegion(:,1:i+1);
                 
-                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i, 'trustRegion', trustRegion);
+                
+                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i, 'functionCalls', functionCalls, 'rho', rhos, 'trustRegion',trustRegion);
             else
                 Hist = struct();
             end

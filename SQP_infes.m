@@ -1,8 +1,8 @@
-function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
+function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);
-    penalty = 100;
+    functionCalls = 0;
 
     % Define relevant functions call
     x = x0;
@@ -21,6 +21,7 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
         xHist = zeros(n,max_iter+1);
         pkHist = zeros(n,max_iter);
         timePerformence = zeros(1,max_iter);
+        functionCalls = 2;
         
         xHist(:,1) = x0;
     end
@@ -34,7 +35,7 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
     % Start for loop
     for i = 1:max_iter
         
-        % Update lower and upper bounds for the quadratic approximation
+        % Update lower and upper bounds for the quadrastart = cputime; approximation
         lk = -x+l;
         uk = -x+u;
         clk = -c+cl;
@@ -50,9 +51,9 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
         ukinf = [uk; inf(2*m,1)];
         
         % Solves local QP program
-        tic
+        start = cputime;
         [pk,~,~,~,zhat] = quadprog(Hinf,ginf,-Cinf,-dinf,[],[],lkinf,ukinf,[],options);
-        time = toc;
+        time = cputime-start;
         zhat = [zhat.lower(1:n); zhat.upper(1:n); zhat.ineqlin(1:2*m)];
         pk = pk(1:n);
         pz = zhat-z;
@@ -69,6 +70,8 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
         % Update values for next iteration
         [~,df] = feval(obj,x);
         [c,dc] = feval(con,x);
+        
+        functionCalls = functionCalls +2;
 
         % Quasi newton update of the hessian
         dL2 = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
@@ -97,7 +100,7 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision)
                 xHist = xHist(:,1:i+1);
                 timePerformence = timePerformence(:,1:i);
                 
-                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i);
+                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i, 'functionCalls' ,functionCalls);
             else
                 Hist = struct();
             end

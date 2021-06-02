@@ -1,12 +1,12 @@
-function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
+function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonotone,penalty)
     
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);
     d = [l;-u;cl;-cu];
-    mu = 0;
-    penalty = 100;
+    mu = penalty;
     alphaOld = 1;
+    functionCalls = 0;
     
   
     % Define relevant functions call
@@ -26,6 +26,8 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
         xHist = zeros(n,max_iter+1);
         pkHist = zeros(n,max_iter);
         timePerformence = zeros(1,max_iter);
+        stepLength = zeros(1,max_iter);
+        functionCalls = 2;
         
         xHist(:,1) = x0;
     end
@@ -38,7 +40,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
     % Start for loop
     for i = 1:max_iter
         
-        % Update lower and upper bounds for the quadratic approximation
+        % Update lower and upper bounds for the quadrastart = cputime; approximation
         lk = -x+l;
         uk = -x+u;
         clk = -c+cl;
@@ -54,9 +56,9 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
         ukinf = [uk; inf(2*m,1)];
         
         % Solves local QP program
-        tic
+        start = cputime;
         [pk,~,~,~,zhat] = quadprog(Hinf,ginf,-Cinf,-dinf,[],[],lkinf,ukinf,[],options);
-        time = toc;
+        time = cputime-start;
         
         zhat = [zhat.lower(1:n); zhat.upper(1:n); zhat.ineqlin(1:2*m)];
         pk = pk(1:n);
@@ -64,6 +66,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
         alpha = 1;
         pz = zhat-z;
         [c_l] = feval(con,x);
+        functionCalls = functionCalls +1;
         c_ls = [x; -x; c_l; -c_l]-d;
         mu = max(abs(z),1/2*(mu+abs(z)));
         phi0 = phi(f,mu,c_ls);
@@ -73,6 +76,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
            x_ls = x + alpha*pk;
            f_ls = obj(x_ls);
            [c_l] = feval(con,x_ls);
+           functionCalls = functionCalls +2;
            c_ls = [x; -x; c_l; -c_l]-d;
 
 
@@ -90,7 +94,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
            end
         end
 
-        if round(alphaOld,precision) == 0 && round(alpha,precision) == 0
+        if ((round(alphaOld,precision) == 0 && round(alpha,precision) == 0) || all(round(pk,precision)==zeros(n,1))) && nonmonotone
             alpha = 1;
         end
 
@@ -107,6 +111,8 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
         % Update values for next iteration
         [f,df] = feval(obj,x);
         [c,dc] = feval(con,x);
+        
+        functionCalls = functionCalls +2;
 
         % Quasi newton update of the hessian
         dL2 = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
@@ -126,6 +132,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
             timePerformence(1,i) = time;
+            stepLength(1,i) = alpha;
         end
         
         if norm(dL2, 'inf')<epsilon
@@ -133,8 +140,9 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision)
                 pkHist = pkHist(:,1:i);
                 xHist = xHist(:,1:i+1);
                 timePerformence = timePerformence(:,1:i);
+                stepLength = stepLength(1,1:i);
                 
-                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i);
+                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i, 'stepLength', stepLength, 'functionCalls' , functionCalls);
             else
                 Hist = struct();
             end

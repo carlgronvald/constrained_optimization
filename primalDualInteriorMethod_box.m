@@ -1,7 +1,8 @@
-function [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
-    mIn = length(u);
+function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
+    mIn = length(x0);
     m = length(y0);
     epsilon = 0.000001;
+    ldltime = 0;
     max_iter = 100;
     eta = 0.995;
     iter = 0;
@@ -32,15 +33,20 @@ function [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
     Hbar = H + diag(zsl + zsu);
     KKT = [Hbar -A; -A' zeros(m)];
     KKT = sparse(KKT);
-    [L,D, P] = ldl(KKT);
+    start = cputime;
+    [L,D,p] = ldl(KKT,'vector');
+    ldltime = ldltime + cputime-start;
+    
 
     % Affine step
     rCs = (rC-s);
     rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
     rhs = -[rLbar ; rA];
-    solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+    
+    solution(p) = L' \ (D \ (L \rhs(p)));
+    %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
 
-    dxAff = solution(1:length(x));
+    dxAff = solution(1:length(x))';
 
     dzAff = - [zsl.*dxAff; -zsu.*dxAff] + (z./s).*rCs;
     dsAff = -s-(s./z).*dzAff;
@@ -56,13 +62,13 @@ function [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
     zu = z(mIn+1:mIn*2);
 
     
-    rL = H*x+g-A*y-(z(1:mIn)-z(mIn+1:mIn*2));
+    rL = H*x+g-A*y-(zl-zu);
     rA = b-A'*x;
     rC = s+[l; -u] - [x; -x];
-    %rSZ = s.*z;
     
     dualGap = (z'*s)/(2*mIn);
     dualGap0 = dualGap;
+
     
     for i = 1:max_iter
         iter = iter + 1;
@@ -71,15 +77,19 @@ function [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
         Hbar = H + diag(zsl + zsu);
         KKT = [Hbar -A; -A' zeros(m)];
         KKT = sparse(KKT);
-        [L,D, P] = ldl(KKT);
+        start = cputime;
+        [L,D,p] = ldl(KKT,'vector');
+        ldltime = ldltime + cputime-start;
         
         % Affine step
         rCs = (rC-s);
         rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
+
         rhs = -[rLbar ; rA];
-        solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+        solution(p) = L' \ (D \ (L \rhs(p)));
+        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
         
-        dxAff = solution(1:length(x));
+        dxAff = solution(1:length(x))';
         
         dzAff = - [zsl.*dxAff; -zsu.*dxAff] + (z./s).*rCs;
         dsAff = -s-(s./z).*dzAff;
@@ -99,10 +109,11 @@ function [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
         rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
         
         rhs = -[rLbar ; rA];
-        solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
+        solution(p) = L' \ (D \ (L \rhs(p)));
         
-        dx = solution(1:length(x));
-        dy = solution(length(x)+1:length(solution));
+        dx = solution(1:length(x))';
+        dy = solution(length(x)+1:length(x)+length(y))';
         
         dz = - [zsl.*dx; -zsu.*dx] + (z./s).*rCs;
         ds = -rSZz-(s./z).*dz;

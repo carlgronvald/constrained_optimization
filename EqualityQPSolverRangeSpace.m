@@ -1,8 +1,10 @@
-function [x, lambda] = EqualityQPSolverRangeSpace(H,g,A,b)
-    M=chol(H); 
-    mu=M'\g;
-    Hg=M\mu;
-    mu=M'\A;
-    HA=M\mu;
+function [x, lambda, time_R] = EqualityQPSolverRangeSpace(H,g,A,b)
+    start = cputime;
+    R=chol(H); 
+    time_R = cputime-start;
+    mu=R'\g;
+    Hg=R\mu;
+    mu=R'\A;
+    HA=R\mu;
     lambda = (A'*HA)\(b+A'*Hg);
     x = HA*lambda-Hg;

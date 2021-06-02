@@ -1,11 +1,11 @@
-function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
+function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonmonotone)
     
-    max_iter = 100;
+    max_iter = 50;
     n = length(x0);
     epsilon = 10^(-precision);
     d = [l;-u;cl;-cu];
     mu = 0;
-    alphaOld = 1;
+    functionCalls = 0;
     
   
     % Define relevant functions call
@@ -28,6 +28,8 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
         xHist = zeros(n,max_iter+1);
         pkHist = zeros(n,max_iter);
         timePerformence = zeros(1,max_iter);
+        stepLength = zeros(1,max_iter);
+        functionCalls = 2;
         
         xHist(:,1) = x0;
     end
@@ -35,7 +37,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
     %Start for loop
     for i = 1:max_iter
         
-        % Update lower and upper bounds for the quadratic approximation
+        % Update lower and upper bounds for the quadrastart = cputime; approximation
         lk = -x+l;
         uk = -x+u;
         clk = -c+cl;
@@ -43,25 +45,27 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
         
         % Solves local QP program
         if subsolver
-            tic
+            start = cputime;
             [pk,zhat] = intSQP(B,df,dc,lk,uk,clk,cuk,x);
-            time = toc;
+            time = cputime-start;
         else
-            tic
+            start = cputime;
             [pk,~,~,~,lambda] = quadprog(B,df,-[dc'; -dc'],-[clk;-cuk],[],[],lk,uk,[], options);
-            time = toc;
+            time = cputime-start;
 
             zhat = [lambda.lower; lambda.upper; lambda.ineqlin];
         end
             
 
         if any(isempty(pk) | isnan(pk) == true)
+            disp(i)
             error('The program is infeasible. Try with infeasibility handling')
         end
 
         alpha = 1;
         pz = zhat-z;
         [c_l] = feval(con,x);
+        functionCalls = functionCalls +1;
         c_ls = [x; -x; c_l; -c_l]-d;
         mu = max(abs(z),1/2*(mu+abs(z)));
         phi0 = phi(f,mu,c_ls);
@@ -70,7 +74,9 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
         while true
            x_ls = x + alpha*pk;
            f_ls = obj(x_ls);
+           functionCalls = functionCalls +1;
            [c_l] = feval(con,x_ls);
+           functionCalls = functionCalls +1;
            c_ls = [x; -x; c_l; -c_l]-d;
 
            phi1 = phi(f_ls,mu,c_ls);
@@ -85,11 +91,10 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
            end
         end
 
-        if round(alphaOld,precision) == 0 && round(alpha,precision) == 0
+        if (all(round(alpha*pk,precision)==zeros(n,1))) && nonmonotone
             alpha = 1;
         end
 
-        alphaOld = alpha;
 
         % Update the current point
         z = z + alpha*pz;
@@ -102,6 +107,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
         % Update values for next iteration
         [f,df] = feval(obj,x);
         [c,dc] = feval(con,x);
+        functionCalls = functionCalls +2;
 
         % Quasi newton update of the hessian
         dL2 = df - (z(lid)-z(uid)+dc*z(clid)-dc*z(cuid));
@@ -122,6 +128,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
             timePerformence(1,i) = time;
+            stepLength(1,i) = sqrt(sum((alpha*pk).^2));
         end
         
         if norm(dL2, 'inf')<epsilon
@@ -129,8 +136,9 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
                 pkHist = pkHist(:,1:i);
                 xHist = xHist(:,1:i+1);
                 timePerformence = timePerformence(:,1:i);
+                stepLength = stepLength(1,1:i);
                 
-                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i);
+                Hist = struct('xHist', xHist, 'pkHist', pkHist, 'timePerformence', timePerformence, 'Iterations' ,i, 'stepLength', stepLength, 'functionCalls', functionCalls);
             else
                 Hist = struct();
             end

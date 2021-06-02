@@ -1,21 +1,37 @@
-rng(14)
+%{
+This is the driver for exercise 2. 
+This file contains:
+    - A test for correctness using the problem given in exercise 1.4.
+      To test for this problem set the variable largeProb to false. The
+      variable is found in the top of the script.
+    - A test for efficiency under growing problem using a random EQP
+      generator with bounds. To test for this problem set the 
+      variable largeProb to true. The size of every increment is 
+      controlled by n_large. The script will run 20 iterations
+%}
+%%
+%Set largeProb to false if one wants the given problem or
+% true if one wants to test on a random large IQP
+largeProb = true;
+n_large = 200;
+
+
+rng(12)
 times = zeros(20, 3);
 bs = [];
 iterations = zeros(20, 3);
 i = 1;
 solution = zeros(20,1);
+ldltimes = zeros(20,1);
 
 %Plot settings
 plotIterations = true;
 plotTimes = true;
 plotSolution = true;
+plotldlvstime = true;
 plotcvx = false;
 
-%If one wants to test with a large problem
-largeProb = true;
-n_large = 10;
-
-for b1 = linspace(8.5, 18.68, 20)
+for b1 = linspace(8.5, 18.68, 30)
 
     %Create a quadratic program
     if ~largeProb
@@ -42,7 +58,8 @@ for b1 = linspace(8.5, 18.68, 20)
     end
 
    % Solve by CVX
-   tic;
+   if plotcvx
+   start = cputime;
 
     cvx_begin quiet
         %cvx_precision low
@@ -54,16 +71,18 @@ for b1 = linspace(8.5, 18.68, 20)
             x <= u
     cvx_end
 
-    times(i,1) = toc;
+    times(i,1) = cputime-start;
     iterations(i,1) = cvx_slvitr;
+   end
 
     %solve by quadprog
-   tic;
+   
     options = optimset('Display', 'off');
     options = optimset(options, 'Algorithm', 'interior-point-convex');
+    start = cputime;
     [x2, optval, exitflag,output] = quadprog(H, g, [],[], A', b,l,u, 0, options);
     
-    times(i,2) = toc;
+    times(i,2) = cputime-start;
     iterations(i,2) = output.iterations;
     
     
@@ -74,10 +93,11 @@ for b1 = linspace(8.5, 18.68, 20)
     y0 = ones(length(b),1);
     z0 = ones(2*n,1);
 
-    tic;
-    [x,y,z,s, iter] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0);
-    times(i,3) = toc;
+    start = cputime;
+    [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0);
+    times(i,3) = cputime-start;
     iterations(i, 3) = iter;
+    ldltimes(i,1) = ldltime;
     
     solution(i,1) = mean(sqrt((x-x2).^2));
 
@@ -85,6 +105,8 @@ for b1 = linspace(8.5, 18.68, 20)
     bs = [bs;b1];
     disp("Iteration " +i +"/" + 20);
     disp("Mean error: " + mean(sqrt((x-x2).^2)))
+    disp("quadprog time: " + times(i,2))
+    disp("our time: " + times(i,3))
     i = i+1;
     
     if exitflag ~= 1
@@ -133,19 +155,19 @@ if plotTimes
     % Not CPU time (since CPU time counts the number of cores used)
     if largeProb
         if plotcvx
-            plot(bs, log(times(:,1)))
+            plot(bs, (times(:,1)))
         end
         hold on
-        plot(bs, log(times(:,2)))
-        plot(bs, log(times(:,3)))
+        plot(bs, (times(:,2)))
+        plot(bs, (times(:,3)))
         hold off
         if plotcvx
-            legend(["cvx iterations", "quadprog interior-point iterations", "Our solver"])
+            legend(["cvx time", "quadprog interior-point time", "Our solver"])
         else
-            legend(["quadprog interior-point iterations", "Our solver"])
+            legend(["quadprog interior-point time", "Our solver"])
         end
 
-        ylabel("t [log s]")
+        ylabel("t [s]")
          xlabel("n")
          title("time vs n")
     else
@@ -157,9 +179,9 @@ if plotTimes
         plot(bs, times(:,3))
         hold off
         if plotcvx
-            legend(["cvx iterations", "quadprog interior-point iterations", "Our solver"])
+            legend(["cvx time", "quadprog interior-point time", "Our solver"])
         else
-            legend(["quadprog interior-point iterations", "Our solver"])
+            legend(["quadprog interior-point time", "Our solver"])
         end
 
         ylabel("t [s]")
@@ -181,3 +203,18 @@ if plotSolution
         xlabel("b(1)")
     end
 end
+
+if plotldlvstime
+    disp('plotting ldl vs time')
+    figure;
+    hold on
+    loglog(bs, (times(:,2)))
+    loglog(bs, (times(:,3)))
+    loglog(bs, (times(:,3))-(ldltimes(:,1)))
+    hold off
+    legend(["quadprog interior-point time", "Our solver", "Our solver without factorization"])
+    ylabel("t [s]")
+     xlabel("n")
+     title("time vs n")
+end
+
