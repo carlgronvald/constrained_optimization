@@ -16,11 +16,11 @@ iterations = zeros(iter_test, 4);
 solution = zeros(iter_test,2);
 
 %Plot settings
-plotIterations = false;
+plotIterations = true;
 plotTimes = true;
 plotLogTimes = false;
-plotSolution = false;
-plotcvx = false;
+plotSolution = true;
+plotcvx = true;
 plotsimplex = true;
 
 if plotcvx

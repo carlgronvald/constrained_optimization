@@ -100,7 +100,7 @@ bineq = zeros(5,1);
 
 
 %% Exercise 5.5-5.7, Solving for different alpha with and without short-selling
-trials = 1000;
+trials = 10;
 x_short = zeros(trials,5,3);
 x_nonshort = zeros(trials,5,3);
 
@@ -166,8 +166,93 @@ end
 
 
 
+figure
+h1 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,1)-x_short(:,:,2)).^2),2)));
+hold on 
+h2 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,3)-x_short(:,:,2)).^2),2)));
+h3 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,3)-x_short(:,:,1)).^2),2)));
+title('Comparison of found portfolios with shorting')
+xlabel('alpha')
+ylabel('Mean Squared Error, log10')
+legend([h1,h2,h3],{'MSE log10, quadprog and our','MSE log10, CVX and our','MSE log10, CVX and quadprog'}, 'Location', 'northeast')
+
+figure
+h1 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,1)-x_nonshort(:,:,2)).^2),2)));
+hold on 
+h2 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,3)-x_nonshort(:,:,2)).^2),2)));
+h3 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,3)-x_nonshort(:,:,1)).^2),2)));
+title('Comparison of found portfolios with no shorting')
+xlabel('alpha')
+ylabel('Mean Squared Error, log10')
+legend([h1,h2,h3],{'MSE log10, quadprog and our','MSE log10, CVX and our','MSE log10, CVX and quadprog'}, 'Location', 'northeast')
+
+
 %% Exercise 5.5-5.7, Plot the portfolios
 clear log
+
+trials = 1000;
+x_short = zeros(trials,5,3);
+x_nonshort = zeros(trials,5,3);
+
+alphas = 1:1:trials;
+alphas = alphas./(trials);
+port_risk_short = zeros(trials,1,3);
+port_risk_nonshort = zeros(trials,1,3);
+port_return_short = zeros(trials,1,3);
+port_return_nonshort = zeros(trials,1,3);
+
+x0 = zeros(5,1);
+s0 = ones(2*5,1);
+y0 = ones(length(beq),1);
+z0 = ones(2*5,1);
+n = 5;
+if trials<11
+    cvx_solve = true;
+else
+    cvx_solve = false;
+end
+
+%optimal port. weights found by quadprog
+for i = 1:trials
+    if mod(i,trials/10)==0
+        disp(i)
+    end
+    % Without shorting, i.e. an IQP problem
+    x_nonshort(i,:,1) = quadprog( alphas(i).*H, (1-alphas(i)).*f', Aineq, bineq, Aeq, beq,[],[],[],options); 
+    x_nonshort(i,:,2) = primalDualInteriorMethod_box(alphas(i).*H, (1-alphas(i)).*f',Aeq',beq,zeros(5,1),ones(5,1),x0,y0,z0,s0);
+    if cvx_solve
+        cvx_begin quiet
+            %cvx_precision low
+            variable x(n)
+            minimize( 1/2 * x' *  (alphas(i).*H) *x + ((1-alphas(i)).*f)*x)
+            subject to
+                Aeq * x == beq
+                zeros(5,1) <= x
+                x <= ones(5,1)
+        cvx_end
+        x_nonshort(i,:,3) = x; 
+    end
+    
+    % With shorting, i.e. an EQP problem
+    x_short(i,:,1) = quadprog( alphas(i).*H, (1-alphas(i)).*f', [], [], Aeq, beq,[],[],[],options); 
+    x_short(i,:,2) = EqualityQPSolver(alphas(i).*H, (1-alphas(i)).*f',Aeq', beq, "rangespace");
+    if cvx_solve
+        cvx_begin quiet
+            %cvx_precision low
+            variable x(n)
+            minimize( 1/2 * x' *  (alphas(i).*H) *x + ((1-alphas(i)).*f)*x)
+            subject to
+                Aeq * x == beq
+        cvx_end
+        x_short(i,:,3) = x; 
+    end
+    
+    port_risk_short(i,2) = x_short(i,:,2)*covariance*x_short(i,:,2)';
+    port_risk_nonshort(i,2) = x_nonshort(i,:,2)*covariance*x_nonshort(i,:,2)';
+    
+    port_return_short(i,2) = -f*x_short(i,:,2)';
+    port_return_nonshort(i,2) = -f*x_nonshort(i,:,2)';
+end
 
 figure
 hold on
@@ -197,25 +282,6 @@ ylabel('Risk [Var]')
 legend([h1,h2],{'Static return','Bi-criterion'}, 'Location', 'northwest')
 hold off
 
-figure
-h1 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,1)-x_short(:,:,2)).^2),2)));
-hold on 
-h2 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,3)-x_short(:,:,2)).^2),2)));
-h3 = plot((1:trials)./trials,log10(sum(sqrt((x_short(:,:,3)-x_short(:,:,1)).^2),2)));
-title('Comparison of found portfolios with shorting')
-xlabel('alpha')
-ylabel('Mean Squared Error, log10')
-legend([h1,h2,h3],{'MSE log10, quadprog and our','MSE log10, CVX and our','MSE log10, CVX and quadprog'}, 'Location', 'northeast')
-
-figure
-h1 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,1)-x_nonshort(:,:,2)).^2),2)));
-hold on 
-h2 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,3)-x_nonshort(:,:,2)).^2),2)));
-h3 = plot((1:trials)./trials,log10(sum(sqrt((x_nonshort(:,:,3)-x_nonshort(:,:,1)).^2),2)));
-title('Comparison of found portfolios with no shorting')
-xlabel('alpha')
-ylabel('Mean Squared Error, log10')
-legend([h1,h2,h3],{'MSE log10, quadprog and our','MSE log10, CVX and our','MSE log10, CVX and quadprog'}, 'Location', 'northeast')
 
 %% Exercise 5.8-5.11, Introducing a risk free security with return 0
 returns = [16.1, 8.5, 15.7, 10.02, 18.68]; 

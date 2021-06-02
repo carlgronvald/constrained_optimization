@@ -12,8 +12,8 @@ This file contains:
 %%
 %Set largeProb to false if one wants the given problem or
 % true if one wants to test on a random large IQP
-largeProb = true;
-n_large = 200;
+largeProb = false;
+n_large = 50;
 
 
 rng(12)
@@ -28,10 +28,10 @@ ldltimes = zeros(20,1);
 plotIterations = true;
 plotTimes = true;
 plotSolution = true;
-plotldlvstime = true;
+plotldlvstime = false;
 plotcvx = false;
 
-for b1 = linspace(8.5, 18.68, 30)
+for b1 = linspace(8.5, 18.68, 20)
 
     %Create a quadratic program
     if ~largeProb
@@ -172,11 +172,11 @@ if plotTimes
          title("time vs n")
     else
         if plotcvx
-            plot(bs, times(:,1))
+            semilogy(bs, times(:,1))
         end
         hold on
-        plot(bs, times(:,2))
-        plot(bs, times(:,3))
+        semilogy(bs, times(:,2))
+        semilogy(bs, times(:,3))
         hold off
         if plotcvx
             legend(["cvx time", "quadprog interior-point time", "Our solver"])
@@ -207,10 +207,11 @@ end
 if plotldlvstime
     disp('plotting ldl vs time')
     figure;
+    hold off
+    plot(bs, (times(:,2)))
     hold on
-    loglog(bs, (times(:,2)))
-    loglog(bs, (times(:,3)))
-    loglog(bs, (times(:,3))-(ldltimes(:,1)))
+    plot(bs, (times(:,3)))
+    plot(bs, (times(:,3))-(ldltimes(:,1)))
     hold off
     legend(["quadprog interior-point time", "Our solver", "Our solver without factorization"])
     ylabel("t [s]")
