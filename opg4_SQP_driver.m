@@ -21,9 +21,10 @@ This file contains:
 fig = figure('Position', [100, 0, 1000,1000]);
 hold on
 edges = 7;
+%Plot the contours themselves
 himmelblauContours(edges)
-%h1 = plot(x0(1,:),x0(2,:),'k.','markersize',40);
-%h2 = plot(x(1,:),x(2,:),'r.','markersize',40);
+
+% Plot all the points of interest (max, min, saddle)
 h1 = plot(-3.073025751,-0.08135304429,'d','MarkerFaceColor','r', ... 
       'MarkerEdgeColor','r','markersize',10);
 h2 = plot(0.08667750456,2.884254701,'d','MarkerFaceColor','r', ... 
@@ -43,11 +44,8 @@ h8 = plot(-0.4869360343,-0.1947744137,'h','MarkerFaceColor','y', ...
 h9 = plot(3.216440661,1.286576264,'h','MarkerFaceColor','y', ... 
       'MarkerEdgeColor','r','markersize',15);
  legend([h8,h7,h2],{'Maximum', 'Minimum', 'Saddle Point'})
-%plot(xHist(1,:),xHist(2,:),strcat(color,'-.'),'linewidth',2,'DisplayName',legendname);
-%legend(h1, legendname)
-%set( get( get( h1, 'Annotation'), 'LegendInformation' ), 'IconDisplayStyle', 'off' );
-%set( get( get( h2, 'Annotation'), 'LegendInformation' ), 'IconDisplayStyle', 'off' );
-% show constraints
+
+% show constraints as dark areas over contour
 x1lim = edges; x1 = -x1lim:0.01:x1lim;
 x2lim = edges; x2 = -x1lim:0.01:x2lim;
 x1f = -edges:0.01:edges;
@@ -73,6 +71,7 @@ axis([-edges edges -edges edges])
 title('Himmelblaus Test Problem')
 
 %% Exercise 4.5, Comparison of fmincon, CasADi and our own SQP-BFGS
+%Solve Himmelblau using fmincon, CasADi, and or own solver.
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
 u = [5;5];
@@ -81,9 +80,11 @@ cu = [47;70];
 addpath('C:\Users\anton\\OneDrive - Københavns Universitet\Uni\Uni\8. semester\Constrained optimization\Casadi')
 import casadi.*
 
+%Solve with fmincon
 options = optimset('Display', 'off');
 xfmin = fmincon(@objfminconHimmel, [0 0], [], [], [], [], l, u, @consfminconHimmel, options);
 
+%Solve with our solver
 options = struct('log',false, 'infesibility_handling', false, 'method', 'SQP', 'subsolver', 'own solver');
 x0 = [0;0];
 [xown,~] = SQPSolver(x0,@objHimmel,@consHimmel,l,u,cl,cu,options);
@@ -93,6 +94,7 @@ x1 = SX.sym('x1');
 x2 = SX.sym('x2');
 nlp = struct ('x',[x1;x2], 'f',(x1^2+x2-11)^2+(x1+x2^2-7)^2,'g',[(x1+2)^2-x2; -4*x1+10*x2]);
 
+%Solve with CasADi
 options = struct;
 options.ipopt.print_level = 0;
 options.print_time = 0;
@@ -100,6 +102,7 @@ S = nlpsol('S', 'ipopt', nlp,options);
 r = S('x0', [0,0], 'lbg',0,'ubg',inf);
 x_Cas =full(r.x);
 
+%Print the solutions
 fprintf('CasADi, solution: [%f,%f] \n', x_Cas(1), x_Cas(2)); 
 fprintf('fmincon, solution: [%f,%f] \n', xfmin(1), xfmin(2)); 
 fprintf('Own solver, solution: [%f,%f] \n', xown(1), xown(2)); 
@@ -107,10 +110,13 @@ fprintf('Own solver, solution: [%f,%f] \n', xown(1), xown(2));
 
 
 %% Efficiency of subsolvers
+%Compare quadprog and our internal solver stepwith growing size random EQP
+% problems.
 options = optimset('Display', 'off');
 times = zeros(20, 2);
 n_large = 50;
 
+%Solve with both our and quadprog for several sizes
 for i=1:20
         n = n_large*i;
         [H, g, A, b] = generateRandomEQP(n,n/2);
@@ -133,6 +139,7 @@ for i=1:20
 end
 
 
+%Plot subsolver time spent on subproblem
 figure
 hold on
 h1 = plot(n_large:n_large:20*n_large,times(:,1),'r');
@@ -148,6 +155,8 @@ cl = [0;0];
 cu = [47;70];
 
 %% Test of the correctness of subsolvers
+%Compare our subsolver to quadprog subsolver, compare - they take the same
+%path
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
@@ -161,6 +170,7 @@ options = struct('log',true, 'infesibility_handling', false, 'method', 'SQP', 's
 xHist = Hist.xHist;
 xHistLatex_1 = latex(sym(round(xHist,3)));
 time_own = Hist.timePerformence;
+%Trace using our solver
 himmelPlot(x0,x,xHist, 'SQP', 'own solver','b',5,'')
 
 
@@ -169,18 +179,22 @@ options = struct('log',true, 'infesibility_handling', false, 'method', 'SQP', 's
 xHist = Hist.xHist;
 xHistLatex_2 = latex(sym(round(xHist,3)));
 time_quad = Hist.timePerformence;
+%Trace using quadprog
 himmelTrace(x0,x,xHist, 'r', 'quadprog','--')
 
 legend show
 
 
 %% Test of SQP BFGS 
+%Test and plot four traces of SQP BFGS all with starting point near each
+% their own minimum of the Himmelblau problem
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
 u = [5;5];
 cl = [0;0];
 cu = [47;70];
+
 % Several traces
 options = struct('log',true, 'infesibility_handling', true, 'method', 'SQP', 'subsolver', 'own solver');
 x0 = [0;0];
@@ -219,6 +233,8 @@ himmelTrace(x0,x,xHist, 'g', 'Trace 4')
 legend show
 
 %% Test of SQP BFGS Line Search
+%Test and plot four traces of line search converging to each their own
+%minimum.
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
@@ -264,6 +280,7 @@ himmelTrace(x0,x,xHist, 'g', 'Trace 4')
 legend show
 
 %% Test of non-monotone strategy
+%Compare non-monotone and monotone strategy for line search
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
@@ -271,6 +288,7 @@ u = [5;5];
 cl = [0;0];
 cu = [47;70];
 
+%Non monotone line search
 x0 = [ -4.5;-1];
 options = struct('log',true, 'infesibility_handling', false, 'method', 'SQP_ls', 'subsolver', 'own solver', 'non_monotone', true);
 [x,~, Hist] = SQPSolver(x0,@objHimmel,@consHimmel,l,u,cl,cu,options);
@@ -281,6 +299,7 @@ xHistLatex_1 = latex(sym(round(xHist,3)));
 stepHist_1 = latex(sym(round(Hist.stepLength,3)));
 himmelPlot(x0,x,xHist, 'SQP linesearch', 'With non monotone strategy')
 
+%Monotone line search
 options = struct('log',true, 'infesibility_handling', false, 'method', 'SQP_ls', 'subsolver', 'own solver', 'non_monotone', false);
 [x,~, Hist] = SQPSolver(x0,@objHimmel,@consHimmel,l,u,cl,cu,options);
 xHist = Hist.xHist;
@@ -295,6 +314,7 @@ legend show
 
 
 %% Test of SQP BFGS Line Search with infeasiblity handling
+%Testing line search with infeasibility handling with just one trace.
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
@@ -320,6 +340,7 @@ himmelPlot(x0,x,xHist, 'SQP linesearch with infeasiblity handling', 'Trace 1','r
 legend show
 
 %% SQP BFGS Trust Region
+%Four traces using Trust Region converging to each their own minimum
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];
@@ -362,6 +383,8 @@ himmelTrace(x0,x,xHist, 'g', 'Trace 4')
 legend show
 
 %% Test of SQP BFGS Trust Region from infeasible start
+%Testing just one trace from infeasible start using trust region and
+%infeasibility handling
 close all
 sympref('FloatingPointOutput',1);
 l = [-5;-5];

@@ -6,7 +6,7 @@ This file contains:
       controlled by n_large and the number of iterations is controlled
       by iter_test.
 %}
-%%
+%% Test efficiency and correctness
 %Configure how many tests and how large an LP to test on
 iter_test = 20;
 n_large = 10;
@@ -27,7 +27,8 @@ if plotcvx
     plotsimplex = true;
 end
 
-
+%We test on a number of random LP problems of different sizes with our
+%solver, cvx, and linprog both using simplex and interior-point.
 for i = 1:iter_test
 
     %Create a quadrastart = cputime; program and solve it using cvx.
@@ -116,18 +117,15 @@ if plotIterations
         legend([ "linprog interior-point iterations", "our solver"])
     end
     ylabel("iterations")
-    %ylim([0 max(max(iterations))+2])
     xlabel("n")
     title("iterations vs n")
 
 end
 
+%Plot time spent for the different solvers
 if plotTimes
     disp("Plotting times!")
     figure;
-    %Note: Time plotted is total wall time between starting and ending
-    %solver
-    % Not CPU time (since CPU time counts the number of cores used)
     if(plotcvx)
         plot(sizes, times(:,1))
         hold on
@@ -151,9 +149,6 @@ if plotLogTimes
     disp("Plotting times!")
     clear log
     figure;
-    %Note: Time plotted is total wall time between starting and ending
-    %solver
-    % Not CPU time (since CPU time counts the number of cores used)
     if(plotcvx)
         loglog(sizes, times(:,1))
         hold on

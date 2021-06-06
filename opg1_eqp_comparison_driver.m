@@ -26,6 +26,7 @@ for b1 = linspace(8.5, 18.68, tests)
     A = [16.1 8.5 15.7 10.02 18.68; 1.0 1.0 1.0 1.0 1.0]';
     b = [b1;1];
 
+    %We test all solvers one by one and save the answers
     start = cputime;
     [x, lambda] = EqualityQPSolver(H,g,A,b, "LDLdense");
     answers(:, i,1) = x;
@@ -60,6 +61,8 @@ for b1 = linspace(8.5, 18.68, tests)
     i = i+1;
 end
 
+
+%We compare answers to quadprog
 answer_diff = zeros(6,20);
 for i=1:6
     answer_diff(i,:) = mean(sqrt((answers(:,:,i)-answers(:,:,7)).^2));
@@ -76,6 +79,7 @@ legend(names)
 xlabel("b(1)")
 ylabel("time [log s]")
 
+%and plot the answers
 figure
 for i=1:6
     plot(bs, (answer_diff(i,:)))
@@ -93,6 +97,7 @@ names = ["LDLdense", "LDLsparse", "LUdense", "LUsparse", "rangespace", "nullspac
 tests = 20;
 times = ones(7,tests)*tests;
 ns = zeros(tests,1);
+%We test every solver using the Recycling problem of different sizes n.
 for i = 1:tests
     disp(i)
     n = i*(2000/tests);
@@ -144,6 +149,7 @@ for i = 1:tests
     disp("n="+n)
 end
 
+%We plot the time for each method.
 figure
 hold off
 for i=1:size(times,1)
@@ -160,6 +166,7 @@ title("Growing size problem")
 tests = 10;
 times = ones(5,tests)*100;
 ns = zeros(tests,1);
+%We bench LU vs LDL versus Cholesky of varying sizes
 for i = 1:tests
     n = i*(5000/tests);
     ns(i) = n;
@@ -201,6 +208,7 @@ for i = 1:tests
 end
 
 
+%We then plot the time for each method and target.
 hold off
 for i=1:5%size(times,1)
     semilogy(ns, times(i,:))
@@ -217,6 +225,8 @@ tests = 10;
 times = ones(2,tests)*100;
 ms = zeros(tests,1);
 top = 3000;
+%To compare range space and null space, we solve random EQPs with varying
+%number of constraints.
 for i = 1:tests
     m = i*(top/tests);
     ms(i) = m;
@@ -251,7 +261,6 @@ plot(ms, times(1,:)-facTime_R)
 plot(ms, times(2,:)-facTime_N)
 xline(1950)
 legend([names,'range space -Cholesky','null space -QR','Theoretical tipping point'], 'Location','northwest')
-%legend([names], 'Location','northwest')
 xlabel("m")
 ylabel("time [s]")
 title("Growing constraints problem, n=3000")
