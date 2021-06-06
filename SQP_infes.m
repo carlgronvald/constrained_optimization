@@ -1,4 +1,24 @@
 function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
+% SQP       A sequential quadratic programing algorithm with a damped BFGS
+%           update of the hessian
+%
+%            min   f(x)
+%             x
+%            s.t   gu>= c(x) >= gl
+%                   u>=  x >= l
+%
+%
+% Syntax: [x,z,Hist] = SQP(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
+%
+%         x             : Solution
+%         z             : Lagrange multipliers
+%         Hist          : Hist object with algorithm ru-time information
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);

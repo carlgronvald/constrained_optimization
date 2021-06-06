@@ -17,20 +17,20 @@ function [H,g,A,b,x,lambda] = generateRandomEQP(n,m)
 %           IMM, Technical University of Denmark
 
 %%
-    % Create a symmetric and pos def Hessian
-    H = rand(n);
-    H = 0.5*(H+H') + n*eye(n);
 
-    % Create a full rank A matrix
+    H = rand(n); %Random n by n matrix
+    H = 0.5*(H+H') + n*eye(n); %Makes H symmetric and pos def
+
+
     A = 10*rand(n); 
     A = 0.5*(A+A')+n*eye(n);
     A = A(:,1:m); 
 
-    % Create a random solution to the system
+
+
     x = rand(n,1);
     lambda = rand(m,1);
 
-    % Create the matching g and b
     KKT = [H -A;-A' zeros(m)];
     sol = [x; lambda];
     rhs = KKT*sol;

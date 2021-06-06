@@ -10,7 +10,7 @@ function himmelblauContours(edges)
 %           IMM, Technical University of Denmark
 
 %%
-    % How wide the plot should be
+    % H
     if nargin<1
         edges = 5;
     end
@@ -34,10 +34,8 @@ function himmelblauContours(edges)
     [C,h] = contour(X1,X2,F,v,'linewidth',2);
     
 
-    % Turns off the legend for the contour
+
     set( get( get( h, 'Annotation'), 'LegendInformation' ), 'IconDisplayStyle', 'off' );
-    
-    % Appropiate labels for the plot
     xlabel('x_1','Fontsize',14)
     ylabel('x_2','Fontsize',14)
     set(gca,'fontsize',14);

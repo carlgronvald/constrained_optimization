@@ -1,4 +1,29 @@
 function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
+% primalDualInteriorMethod_box   An interior point solver based on Mehrota's predictor-corrector
+%                                   primal-dual interior point algorithm. It takes 
+%                                   problems of the form
+%
+%            min    x'Hx+g'x
+%             x
+%            s.t     Ax  = b
+%                u>=  x >= l
+%
+%
+% Syntax: [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,y0,z0,s0)
+%
+%         x             : Solution
+%         y             : Equality lagrange multipliers
+%         z             : Inequality lagrange multipliers
+%         s             : Slack variables
+%         iter          : Iterations used
+%         ldltime       : Time used on ldl factorization
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
+    % Sets constants for the algorithm
     mIn = length(x0);
     m = length(y0);
     epsilon = 0.000001;
@@ -7,27 +32,31 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
     eta = 0.995;
     iter = 0;
     
+    % Initial values  
     x = x0;
     y = y0;
     z = z0;
     s = s0;
+    
+    % Makes sure non of the following matrix operations are singular
     while(any(s==0))
         x = x+0.000001;
         s = [x-l;-x+u];
     end
     
-    
+    %Initilize constraint specific slacks and lagrange multipliers 
     e = ones(mIn*2,1);
     sl = s(1:mIn);
     su = s(mIn+1:mIn*2);
     zl = z(1:mIn);
     zu = z(mIn+1:mIn*2);
     
+    %initial residuals
     rL = H*x+g-A*y-(z(1:mIn)-z(mIn+1:mIn*2));
     rA = b-A'*x;
     rC = s+[l; -u] - [x; -x];
     
-    % Initial point heuristic
+    % Start point heuristic
     zsl = zl./sl;
     zsu = zu./su;
     Hbar = H + diag(zsl + zsu);
@@ -44,7 +73,6 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
     rhs = -[rLbar ; rA];
     
     solution(p) = L' \ (D \ (L \rhs(p)));
-    %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
 
     dxAff = solution(1:length(x))';
 
@@ -66,6 +94,7 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
     rA = b-A'*x;
     rC = s+[l; -u] - [x; -x];
     
+    % Initial dual gap
     dualGap = (z'*s)/(2*mIn);
     dualGap0 = dualGap;
 
@@ -87,7 +116,6 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
 
         rhs = -[rLbar ; rA];
         solution(p) = L' \ (D \ (L \rhs(p)));
-        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
         
         dxAff = solution(1:length(x))';
         
@@ -109,7 +137,6 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
         rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
         
         rhs = -[rLbar ; rA];
-        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
         solution(p) = L' \ (D \ (L \rhs(p)));
         
         dx = solution(1:length(x))';
@@ -142,8 +169,10 @@ function [x,y,z,s, iter, ldltime] = primalDualInteriorMethod_box(H,g,A,b,l,u,x0,
         rA = b-A'*x;
         rC = s+[l; -u] - [x; -x];
 
+        % Compute the dual gap        
         dualGap = (z'*s)/(2*mIn);
         
+        % Check for convergence
         if(dualGap <= epsilon*0.01*dualGap0)
            return
         end

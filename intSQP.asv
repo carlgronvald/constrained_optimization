@@ -21,7 +21,16 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
 %           IMM, Technical University of Denmark
 
 %%
-    % Sets constants for the algorithm
+%{
+This solver takes programs of the form 
+
+            min_x f(x)
+            s.t   gu>= cx >= gl
+                   u>=  x >= l
+
+The solver is based on Mehrotas predictor-corrector primal-dual algorithm. 
+
+%}
     warning('off','all')    
     n = length(x0);
     m = length(cuk);
@@ -31,19 +40,16 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
     eta = 0.995;
     feasible = 1;
     
-    % Initial values
     x = x0;
     z = ones(mc,1);
     s = ones(mc,1);
     d = [lk;-uk;clk;-cuk];
     e = ones(2*n+2*m,1);
     
-    % Makes sure non of the following matrix operations are singular
     while(any(s==0))
         x = x+0.000001;
         s = [x;-x; dc'*x; -dc'*x]-d;
     end
-    
     %Initilize constraint specific slacks and lagrange multipliers
     sl = s(1:n);
     su = s(n+1:n*2);
@@ -58,7 +64,7 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
     rL = B*x+df-(zl-zu+dc*zcl-dc*zcu);
     rC = s+d - [x; -x; dc'*x; -dc'*x];
     
-    % Start point heuristic
+    % Initial point heuristic
     zsl = diag(zl./sl);
     zsu = diag(zu./su);
     zslc = zcl./scl;
@@ -67,7 +73,7 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
     Hbar = B + zsl + zsu + bsxfun(@times,zc',dc)*dc';
     [L,D,P] = ldl(Hbar,'lower');
 
-    % Affine step for the start point heuristic
+    % Affine step
     rCs = (rC-s);
     rLbar = rL - [ zsl -zsu bsxfun(@times,zslc',dc) bsxfun(@times,zsuc',-dc)]*rCs;
     
@@ -96,7 +102,6 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
     rC = s+d - [x; -x; dc'*x; -dc'*x];
     rSZ = s.*z;
     
-    % Initial dual gap
     dualGap = (z'*s)/(mc);
     dualGap0 = dualGap;
     
@@ -131,7 +136,9 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
         
         
         % Affine-Centering-Correction Direction
-        rSZbar = rSZ + dsAff.*dzAff-sigma*dualGap*sigma*e;        
+        rSZbar = rSZ + dsAff.*dzAff-sigma*dualGap*sigma*e;
+        
+        
         rLbar = rL - [ zsl -zsu bsxfun(@times,zslc',dc) bsxfun(@times,zsuc',-dc)]*(rC-rSZbar./z);
         
         rhs = -rLbar;
@@ -166,16 +173,14 @@ function [x,z,feasible,i] = intSQP(B,df,dc,lk,uk,clk,cuk,x0)
         rL = B*x+df-(zl-zu+dc*zcl-dc*zcu);
         rC = s+d - [x; -x; dc'*x; -dc'*x];
         rSZ = s.*z;
-        
-        % Compute the dual gap
+
         dualGap = (z'*s)/(mc);
         
         if any(isnan(z))
             feasible = 0;
             return
         end
-        
-        % Check for convergence
+
         if(dualGap <= epsilon*0.01*dualGap0)
            return 
         end

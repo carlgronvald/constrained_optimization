@@ -124,12 +124,12 @@ argument which functions as follows:
         end
         
     elseif method == "SQP_ls" && infesibility_handling==0
-        %try
+        try
         [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log,subsolver,precision, non_monotone);
-        %catch
-        %    close all
-        %    error('The program is infeasible. Try with infeasibility handling')
-        %end
+        catch
+            close all
+            error('The program is infeasible. Try with infeasibility handling')
+        end
         
     elseif method == "SQP" && infesibility_handling==1
         [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty);

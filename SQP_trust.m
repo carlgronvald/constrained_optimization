@@ -3,8 +3,6 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
     n = length(x0);
     epsilon = 10^(-precision);
     mu = penalty;
-    
-    
     dk0 = trust_region;
     dk = dk0;
     time = 0;
@@ -120,8 +118,11 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
             end
             r = theta*q+(1-theta)*(Bp);
             B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
+            
+            % Update the trust region
             dk = gamma*dk;
         else
+            % Update the trust region
             dk = gamma * vecnorm(pk,'Inf');
         end
 

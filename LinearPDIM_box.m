@@ -1,45 +1,72 @@
 function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
+% LinearPDIM_box   An interior point solver based on Mehrota's predictor-corrector
+%                   primal-dual interior point algorithm. It takes 
+%                   problems of the form
+%
+%            min    g'x
+%             x
+%            s.t     Ax  = b
+%                u>=  x >= l
+%
+%
+% Syntax: [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
+%
+%         x             : Solution
+%         y             : Equality lagrange multipliers
+%         z             : Inequality lagrange multipliers
+%         s             : Slack variables
+%         iter          : Iterations used
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
+    % Sets constants for the algorithm
     mIn = length(u);
     epsilon = 0.000000001;
     max_iter = 100;
     eta = 0.995;
     iter = 0;
     
+    % Initial values    
     x = x0;
     y = y0;
     z = z0;
     s = s0;
+    
+    % Makes sure non of the following matrix operations are singular
     while(any(s==0))
         x = x+0.000001;
         s = [x-l;-x+u];
     end
     
-    
+    %Initilize constraint specific slacks and lagrange multipliers    
     e = ones(mIn*2,1);
     sl = s(1:mIn);
     su = s(mIn+1:mIn*2);
     zl = z(1:mIn);
     zu = z(mIn+1:mIn*2);
-    
+
+    %initial residuals
     rL = g-A*y-(z(1:mIn)-z(mIn+1:mIn*2));
     rA = b-A'*x;
     rC = s+[l; -u] - [x; -x];
     
-    % Initial point heuristic
+    % Start point heuristic
     zsl = zl./sl;
     zsu = zu./su;
     
-    % Affine step
+    % Affine step for the start point heuristic
     rCs = (rC-s);
     rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
     Hbar_diagonal_inverse = 1./(zsl+zsu);
+    
     % Calculate the factor in the normal equation
     normalfactor = A' * (Hbar_diagonal_inverse .*  A);
     R = chol(normalfactor);
     
     mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
-    %This is normal equation stuff as well
-    % I should probably factorize the normal factor myself.
     dyAff = R \ (R' \ mu_rhs);
     dxAff = Hbar_diagonal_inverse .* (-rLbar + A*dyAff);
 
@@ -60,8 +87,8 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
     rL = g-A*y-(z(1:mIn)-z(mIn+1:mIn*2));
     rA = b-A'*x;
     rC = s+[l; -u] - [x; -x];
-    %rSZ = s.*z;
     
+    % Initial dual gap
     dualGap = (z'*s)/(2*mIn);
     dualGap0 = dualGap;
     
@@ -73,18 +100,13 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         % Affine step
         rCs = (rC-s);
         rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
-        
-        
-        % CALCULATE DxAff USING NORMAL EQUATIONS
-        
+      
+        % Calculate the factor in the normal equation       
 		Hbar_diagonal_inverse = 1./(zsl+zsu);
-        % Calculate the factor in the normal equation
 		normalfactor = A' * (Hbar_diagonal_inverse .*  A);
         R = chol(normalfactor);
         
         mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
-        %This is normal equation stuff as well
-        % I should probably factorize the normal factor myself.
 		dyAff = R \ (R' \ mu_rhs);
 		dxAff = Hbar_diagonal_inverse .* (-rLbar + A*dyAff);
         
@@ -107,24 +129,12 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         
 		rLbar = rL - zsl.*rCs(1:mIn) +zsu.*rCs(1+mIn:2*mIn);
         
-		
-		% This is where we need to change things to use normal equations
-		% X^-1 Lambda = Hbar
-		% A dx = -rC
-		% (A Lambda^-1 X A') dy = -rc -A(-Lambda^-1 X rL - Lambda^-1 rC)
-		
-        %rhs = -[rLbar ; rA];
-        %solution = P*(L' \ (D \ (L \ (P'*rhs) )));
-        
-        %dx = solution(1:length(x));
-        %dy = solution(length(x)+1:length(solution));
-        
-		% This has already been calculated: Hbar_diagonal_inverse = 1./(zsl+zsu);
         % Calculate the factor in the normal equation
 		normalfactor = A' * (Hbar_diagonal_inverse .*  A);
         R = chol(normalfactor);
         
         mu_rhs = rA + A' * (Hbar_diagonal_inverse .* rLbar);
+        
         %This is normal equation stuff as well
 		dy = R \ (R' \ mu_rhs);
 		dx = Hbar_diagonal_inverse .* (-rLbar + A*dy);
@@ -155,9 +165,11 @@ function [x,y,z,s, iter] = LinearPDIM_box(g,A,b,l,u,x0,y0,z0,s0)
         rL = g-A*y-(z(1:mIn)-z(mIn+1:mIn*2));
         rA = b-A'*x;
         rC = s+[l; -u] - [x; -x];
-
-        dualGap = (z'*s)/(2*mIn);
         
+        % Compute the dual gap
+        dualGap = (z'*s)/(2*mIn);
+ 
+        % Check for convergence
         if(dualGap <= epsilon*0.01*dualGap0)
            return
         end
