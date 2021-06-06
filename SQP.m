@@ -12,7 +12,7 @@ function [x,z,Hist] = SQP(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
 %
 %         x             : Solution
 %         z             : Lagrange multipliers
-%         Hist          : Hist object with algorithm ru-time information
+%         Hist          : Hist object with algorithm run-time information
 
 % Created: 06.06.2021
 % Authors : Anton Ruby Larsen and Carl Frederik Grønvald
