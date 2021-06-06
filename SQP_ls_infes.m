@@ -1,11 +1,30 @@
 function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonotone,penalty)
+% SQP_ls_infes       A sequential quadratic programing algorithm with a damped BFGS
+%                       update of the hessian, line search and infeasibility handling
+%
+%            min   f(x)
+%             x
+%            s.t   gu>= c(x) >= gl
+%                   u>=  x >= l
+%
+%
+% Syntax: [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonotone,penalty)
+%
+%         x             : Solution
+%         z             : Lagrange multipliers
+%         Hist          : Hist object with algorithm run-time information
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
     
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);
     d = [l;-u;cl;-cu];
     mu = penalty;
-    alphaOld = 1;
     functionCalls = 0;
     
   
@@ -35,7 +54,6 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonoton
     % Define options for quadprog
     options = optimset('Display', 'off');
     
-    % Values for infeasibility handling
     
     % Start for loop
     for i = 1:max_iter
@@ -63,6 +81,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonoton
         zhat = [zhat.lower(1:n); zhat.upper(1:n); zhat.ineqlin(1:2*m)];
         pk = pk(1:n);
 
+        %line search
         alpha = 1;
         pz = zhat-z;
         [c_l] = feval(con,x);
@@ -94,11 +113,10 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonoton
            end
         end
 
-        if ((round(alphaOld,precision) == 0 && round(alpha,precision) == 0) || all(round(pk,precision)==zeros(n,1))) && nonmonotone
+        % non monotone strategy
+        if (all(round(alpha*pk,precision)==zeros(n,1))) && nonmonotone
             alpha = 1;
         end
-
-        alphaOld = alpha;
 
         % Update the current point
         z = z + alpha*pz;
@@ -128,6 +146,8 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonoton
         end
         r = theta*q+(1-theta)*(Bp);
         B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
+        
+        % Store logging information
         if log
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
@@ -135,6 +155,7 @@ function [x,z,Hist] = SQP_ls_infes(x0,obj,con,l,u,cl,cu,log,precision,nonmonoton
             stepLength(1,i) = alpha;
         end
         
+        % Check convergence
         if norm(dL2, 'inf')<epsilon
             if log
                 pkHist = pkHist(:,1:i);

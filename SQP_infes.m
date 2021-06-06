@@ -1,6 +1,6 @@
 function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
-% SQP       A sequential quadratic programing algorithm with a damped BFGS
-%           update of the hessian
+% SQP_infes       A sequential quadratic programing algorithm with a damped BFGS
+%                   update of the hessian and infeasibility handling
 %
 %            min   f(x)
 %             x
@@ -8,11 +8,11 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
 %                   u>=  x >= l
 %
 %
-% Syntax: [x,z,Hist] = SQP(x0,obj,con,l,u,cl,cu,log, subsolver,precision)
+% Syntax: [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
 %
 %         x             : Solution
 %         z             : Lagrange multipliers
-%         Hist          : Hist object with algorithm ru-time information
+%         Hist          : Hist object with algorithm run-time information
 
 % Created: 06.06.2021
 % Authors : Anton Ruby Larsen and Carl Frederik Grønvald
@@ -108,12 +108,14 @@ function [x,z,Hist] = SQP_infes(x0,obj,con,l,u,cl,cu,log,precision,penalty)
         r = theta*q+(1-theta)*(Bp);
         B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
         
+        % log information
         if log
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
             timePerformence(1,i) = time;
         end
         
+        % Check for convergence
         if norm(dL2, 'inf')<epsilon
             if log
                 pkHist = pkHist(:,1:i);

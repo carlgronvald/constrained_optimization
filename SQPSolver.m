@@ -1,7 +1,7 @@
 function [x,z,Hist] = SQPSolver(x0,obj,con,l,u,cl,cu, options)
 %{
-The function SQPSolver has an option
-argument which functions as follows:
+This is the solver inteface for all the SQP algorithms. The interface has
+ the input 'option' argument which functions as follows:
     Options:
     log - Do you want to log the process
         values: true/false
@@ -30,6 +30,11 @@ argument which functions as follows:
 
     penalty - Set the inital penalty
         values: reals above 100.
+
+
+Created: 06.06.2021
+Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+          IMM, Technical University of Denmark
 %}
     if nargin <8
         options = struct();

@@ -1,9 +1,23 @@
 function [x, lambda,time] = EqualityQPSolver(H, g, A, b, solver)
-%EQUALITYQPSOLVER Solves the EQP given by H, g, A, b
-%   minimizes 1/2 x' H x + g'x st. A'x=b using the given solver
+% EqualityQPSolver      The solver interface for the equality EQP solvers
 %
-%   Allowed solvers are LDLdense, LDLsparse, LUdense, LUsparse, rangespace
-%   & nullspace
+%          min  x'*H*x+g'x
+%           x
+%          s.t. A x  = b      (Lagrange multiplier: lambda)
+%
+%
+% Syntax: [x, lambda,time] = EqualityQPSolver(H, g, A, b, solver)
+%
+%         x             : Solution
+%         z             : Lagrange multipliers
+%         time          : Time used on factorization in some of the
+%                           algorithms
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
 time = 0;
 if solver == "LDLdense"
     [x, lambda] = EqualityQPSolverLDLdense(H,g,A,b);

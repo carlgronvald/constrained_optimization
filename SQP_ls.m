@@ -1,5 +1,24 @@
 function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonmonotone)
-    
+% SQP_ls       A sequential quadratic programing algorithm with a damped BFGS
+%               update of the hessian and line search
+%
+%            min   f(x)
+%             x
+%            s.t   gu>= c(x) >= gl
+%                   u>=  x >= l
+%
+%
+% Syntax: [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonmonotone)
+%
+%         x             : Solution
+%         z             : Lagrange multipliers
+%         Hist          : Hist object with algorithm run-time information
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%  
     max_iter = 50;
     n = length(x0);
     epsilon = 10^(-precision);
@@ -62,6 +81,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonm
             error('The program is infeasible. Try with infeasibility handling')
         end
 
+        % Line search
         alpha = 1;
         pz = zhat-z;
         [c_l] = feval(con,x);
@@ -91,6 +111,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonm
            end
         end
 
+        % non monotone strategy
         if (all(round(alpha*pk,precision)==zeros(n,1))) && nonmonotone
             alpha = 1;
         end
@@ -124,6 +145,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonm
         r = theta*q+(1-theta)*(Bp);
         B = B + r*r'/(p'*r) - Bp*Bp'/pBp;
         
+        % log information
         if log
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
@@ -131,6 +153,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonm
             stepLength(1,i) = sqrt(sum((alpha*pk).^2));
         end
         
+        % Check for convergence
         if norm(dL2, 'inf')<epsilon
             if log
                 pkHist = pkHist(:,1:i);
@@ -148,6 +171,7 @@ function [x,z,Hist] = SQP_ls(x0,obj,con,l,u,cl,cu,log, subsolver,precision, nonm
    end
 
 end
+% Functions for the line search algorithm
 function [val] = phi(f,mu,c)
 val = f+mu'*abs(min(0,c));
 end

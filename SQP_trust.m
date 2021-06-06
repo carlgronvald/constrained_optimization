@@ -1,4 +1,24 @@
 function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region, penalty)
+% SQP_trust       A sequential quadratic programing algorithm with a damped BFGS
+%                   update of the hessian, line search and infeasibility handling
+%
+%            min   f(x)
+%             x
+%            s.t   gu>= c(x) >= gl
+%                   u>=  x >= l
+%
+%
+% Syntax: [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region, penalty)
+%
+%         x             : Solution
+%         z             : Lagrange multipliers
+%         Hist          : Hist object with algorithm run-time information
+
+% Created: 06.06.2021
+% Authors : Anton Ruby Larsen and Carl Frederik Grønvald
+%           IMM, Technical University of Denmark
+
+%%
     max_iter = 100;
     n = length(x0);
     epsilon = 10^(-precision);
@@ -38,8 +58,6 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
     options = optimset('Display', 'off');
     
 
-        
-    
     % Start for loop
     for i = 1:max_iter
         
@@ -67,7 +85,7 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
         mu = max(1/2*(mu+zinf),zinf);
         mu_vec = mu*ones(n*2+m*2,1);
         
-        %Find rho
+        %Calculate relevant values for the trust region
         [c_full, dc_full] = cons(x,true,dinf(1:2*n+2*m));
         functionCalls = functionCalls +1;
 
@@ -86,7 +104,7 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
         
         gamma = min(max((2*rho-1)^3+1,0.25),2);
         
-        
+        % If trust region is accepted
         if rho>0
             % Update the current point
             z = zhat;
@@ -121,12 +139,14 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
             
             % Update the trust region
             dk = gamma*dk;
+        
+        % If the trust region is not accepted
         else
             % Update the trust region
             dk = gamma * vecnorm(pk,'Inf');
         end
 
-
+        % Store relevant logging information
         if log
             pkHist(:,i) = pk;
             xHist(:,i+1) = x;
@@ -136,6 +156,7 @@ function [x,z,Hist] = SQP_trust(x0,obj,cons,l,u,cl,cu,log,precision,trust_region
             time = 0;
         end
 
+        % Check for convergence 
         if norm(dL2, 'inf')<epsilon
             if log
                 pkHist = pkHist(:,1:i);
